@@ -143,7 +143,7 @@ class VersionBurndownChartsController < ApplicationController
     if journals.empty?
       return 0
     end
-      
+
     journal_details =
       journals.map(&:details).flatten.select {|detail| 'status_id' == detail.prop_key}
 
@@ -158,6 +158,9 @@ class VersionBurndownChartsController < ApplicationController
       end
     end
 
+    remaining_time = remaining_time(issue, journals)
+    return total_time(issue, target_date) - remaining_time unless remaining_time.nil?
+ 
     journal_details_done_ratio =
       journals.map(&:details).flatten.select {|detail| 'done_ratio' == detail.prop_key}
     if journal_details_done_ratio.empty?
@@ -172,6 +175,25 @@ class VersionBurndownChartsController < ApplicationController
 
     logger.debug("#{target_date} id #{issue.id}, whole #{issue.estimated_hours}, done #{target_hours}")
     return target_hours
+  end
+
+  def total_time(issue, target_date)
+    return issue.estimated_hours
+  end
+
+  def remaining_time(issue, journals)
+    cf_remaining_time = CustomField.find_by_name("remaining_time")
+    if cf_remaining_time.present?
+      journal_details_remaining_time =
+        journals.map(&:details).flatten.select {|detail| cf_remaining_time.id.to_s == detail.prop_key and detail.property == "cf"}
+      unless journal_details_remaining_time.empty?
+        journal_details_last = journal_details_remaining_time.last
+        unless journal_details_last.value.blank?
+          return journal_details_last.value.to_i
+        end
+      end
+    end
+    return nil
   end
 
   def round(value)
